@@ -33,7 +33,6 @@
     <script type="text/babel">
         // --- 1. Icons ---
         const Icons = {
-            // [NEW] 요청하신 파란 원형 아이콘 스타일 반영
             KingdomHall: ({ className }) => (
                 <svg viewBox="0 0 24 24" fill="none" className={className}>
                     <circle cx="12" cy="12" r="12" fill="#4A6FA5"/>
@@ -66,7 +65,6 @@
         };
 
         // --- 2. Configuration & Logic ---
-        
         const firebaseConfig = {
             apiKey: "AIzaSyAtOwsAO19kLCAzxWvnijtwkPjQh1LXxgk",
             authDomain: "dashboard-9d8e7.firebaseapp.com",
@@ -87,9 +85,7 @@
             }
             auth = firebase.auth();
             db = firebase.firestore();
-        } catch (e) {
-            console.error("Firebase Init Error:", e);
-        }
+        } catch (e) { console.error("Firebase Init Error:", e); }
 
         // Utils
         const compressImage = (file) => {
@@ -125,15 +121,23 @@
             });
         };
 
-        const getDayName = (date) => {
-            const days = ['(일)', '(월)', '(화)', '(수)', '(목)', '(금)', '(토)'];
-            return days[date.getDay()];
-        }
+        const getDayName = (date) => ['(일)', '(월)', '(화)', '(수)', '(목)', '(금)', '(토)'][date.getDay()];
 
         const formatDateFriendly = (dateStr) => {
             if (!dateStr) return '';
             const date = new Date(dateStr);
             return `${date.getFullYear()}. ${String(date.getMonth() + 1).padStart(2, '0')}. ${String(date.getDate()).padStart(2, '0')} ${getDayName(date)}`;
+        };
+
+        const formatEventDate = (start, end) => {
+            const s = new Date(start);
+            const sStr = `${String(s.getMonth()+1).padStart(2,'0')}. ${String(s.getDate()).padStart(2,'0')} ${getDayName(s)}`;
+            if (end && end !== start) {
+                const e = new Date(end);
+                const eStr = `${String(e.getMonth()+1).padStart(2,'0')}. ${String(e.getDate()).padStart(2,'0')} ${getDayName(e)}`;
+                return `${s.getFullYear()}. ${sStr} - ${eStr}`;
+            }
+            return `${s.getFullYear()}. ${sStr}`;
         };
 
         function App() {
@@ -186,10 +190,17 @@
                     return; 
                 }
 
+                // 1. Notice Board Subscription
+                // 중요: 데이터 객체에 ref를 포함시켜서 나중에 경로 없이도 삭제 가능하게 함
                 const noticeRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('notice_board');
                 const unsubNotice = noticeRef.onSnapshot(snapshot => {
-                    let docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                    docs = docs.filter(d => !d.isDeleted);
+                    let docs = snapshot.docs.map(d => ({ 
+                        id: d.id, 
+                        ...d.data(),
+                        ref: d.ref // [핵심] 문서 참조 저장
+                    }));
+                    docs = docs.filter(d => !d.isDeleted); // Soft delete filter
+
                     if (loginState === 'publisher') {
                         docs = docs.filter(doc => doc.targetAudience !== 'elder');
                     }
@@ -200,10 +211,16 @@
                     setDocuments(docs);
                 });
 
+                // 2. Schedule Board Subscription
                 const schedRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('schedule_board');
                 const unsubSched = schedRef.onSnapshot(snapshot => {
-                    let evts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+                    let evts = snapshot.docs.map(d => ({ 
+                        id: d.id, 
+                        ...d.data(),
+                        ref: d.ref // [핵심] 문서 참조 저장
+                    }));
                     evts = evts.filter(e => !e.isDeleted);
+                    
                     evts.sort((a, b) => new Date(a.date) - new Date(b.date));
                     const today = new Date().toISOString().split('T')[0];
                     evts = evts.filter(e => (e.endDate || e.date) >= today); 
@@ -220,36 +237,39 @@
                 else { setLoginError('비밀번호가 올바르지 않습니다.'); setPasswordInput(''); }
             };
 
-            // [강제 삭제 로직 적용]
-            const handleDelete = (e, docId, collectionName) => {
+            // [최종 수정] 완벽한 삭제 로직 (Optimistic UI + Direct Ref)
+            const handleDelete = (e, item, collectionName) => {
                 e.preventDefault();
-                e.stopPropagation(); // 이벤트 전파 중단
+                e.stopPropagation(); 
                 
                 if (!confirm('정말 삭제하시겠습니까?')) return;
                 
-                // 1. 화면에서 즉시 제거 (Optimistic UI)
+                // 1. 화면에서 즉시 제거 (사용자 경험 최우선)
                 if (collectionName === 'notice_board') {
-                    setDocuments(prev => prev.filter(d => d.id !== docId));
+                    setDocuments(prev => prev.filter(d => d.id !== item.id));
                 } else {
-                    setEvents(prev => prev.filter(e => e.id !== docId));
+                    setEvents(prev => prev.filter(e => e.id !== item.id));
                 }
                 
-                // 2. 서버에 비동기 요청 (결과 기다리지 않음)
-                db.collection('artifacts').doc(appId).collection('public').doc('data').collection(collectionName).doc(docId).delete()
-                    .catch(() => {
-                        // 권한 문제로 삭제 실패 시 Soft Delete 시도
-                        db.collection('artifacts').doc(appId).collection('public').doc('data').collection(collectionName).doc(docId).update({ isDeleted: true });
+                // 2. 서버에 삭제 요청 (저장해둔 ref 사용 -> 경로 오류 없음)
+                if (item.ref) {
+                    item.ref.delete().catch(err => {
+                        console.warn("Hard delete failed (Permission?), trying soft delete", err);
+                        // 권한 문제 시 Soft Delete 시도
+                        item.ref.update({ isDeleted: true }).catch(e => console.error("All delete failed", e));
                     });
+                } else {
+                    // Fallback: 기존 경로 방식
+                    db.collection('artifacts').doc(appId).collection('public').doc('data').collection(collectionName).doc(item.id).delete();
+                }
 
-                if (collectionName === 'notice_board' && activeDoc?.id === docId) setActiveDoc(null);
+                if (collectionName === 'notice_board' && activeDoc?.id === item.id) setActiveDoc(null);
             };
 
             const handleTogglePin = async (e, docData) => {
                 e.stopPropagation();
                 try {
-                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('notice_board').doc(docData.id).update({
-                        isPinned: !docData.isPinned
-                    });
+                    await docData.ref.update({ isPinned: !docData.isPinned });
                 } catch (err) { alert('고정 실패'); }
             };
 
@@ -387,7 +407,7 @@
                                                 </div>
                                             </div>
                                             {loginState === 'admin' && (
-                                                <button onClick={(e) => handleDelete(e, evt.id, 'schedule_board')} className="absolute top-4 right-4 p-3 bg-white shadow border border-slate-100 text-slate-400 hover:text-red-500 rounded-full z-50 cursor-pointer"><Icons.Trash2 className="w-5 h-5" /></button>
+                                                <button onClick={(e) => handleDelete(e, evt, 'schedule_board')} className="absolute top-4 right-4 p-3 bg-white shadow border border-slate-100 text-slate-400 hover:text-red-500 rounded-full z-50 cursor-pointer"><Icons.Trash2 className="w-5 h-5" /></button>
                                             )}
                                         </div>
                                     ))
@@ -424,7 +444,7 @@
                                                 <div className="absolute top-1 right-1 flex gap-1 bg-black/10 p-1 rounded-lg backdrop-blur-sm z-30" onClick={(e) => e.stopPropagation()}>
                                                     <button onClick={(e) => handleTogglePin(e, doc)} className={`p-2 rounded bg-white shadow-sm ${doc.isPinned ? 'text-[#4A6FA5]' : 'text-slate-500'}`}><Icons.Pin className="w-5 h-5" fill={doc.isPinned ? "currentColor" : "none"} /></button>
                                                     <button onClick={(e) => { e.stopPropagation(); setEditingDoc(doc); setEditTab('notice'); setIsEditMode(true); }} className="p-2 rounded bg-white shadow-sm text-slate-500 hover:text-[#4A6FA5]"><Icons.Edit2 className="w-5 h-5" /></button>
-                                                    <button onClick={(e) => handleDelete(e, doc.id, 'notice_board')} className="p-2 rounded bg-white shadow-sm text-slate-500 hover:text-red-500"><Icons.Trash2 className="w-5 h-5" /></button>
+                                                    <button onClick={(e) => handleDelete(e, doc, 'notice_board')} className="p-2 rounded bg-white shadow-sm text-slate-500 hover:text-red-500"><Icons.Trash2 className="w-5 h-5" /></button>
                                                 </div>
                                             )}
                                         </div>
