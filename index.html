@@ -2,84 +2,91 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>거창 회중 게시판</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Import Map -->
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.2.0",
-        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.294.0",
-        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-        "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
-      }
-    }
-    </script>
+    <!-- React & ReactDOM (UMD Build for Stability) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel (JSX Converter) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Babel Standalone -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
+    <!-- Firebase Compat Library (Most Stable for HTML implementation) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-        /* 스크롤바 커스텀 */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        
-        /* 애니메이션 */
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+        /* 스크롤바 숨김 (깔끔한 UI) */
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="bg-[#F0F2F5]">
-    <div id="root"></div>
+<body class="bg-[#F4F6F8] text-slate-800 h-screen overflow-hidden selection:bg-[#4A6FA5] selection:text-white">
+    <div id="root" class="h-full"></div>
 
-    <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo } from 'react';
-        import { createRoot } from 'react-dom/client';
-        import { 
-            X, Maximize2, Minimize2, FileText, Image as ImageIcon, 
-            Download, Plus, Trash2, Edit2, Lock, Save, Upload, Loader, 
-            CheckCircle, ArrowRight, Pin, Users, Shield, Calendar, ChevronRight, AlertTriangle 
-        } from 'lucide-react';
+    <script type="text/babel">
+        // --- 1. Icons (Embedded SVGs for Stability) ---
+        const Icons = {
+            KingdomHall: ({ className }) => (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                    <path d="M2 8h20" /><path d="M5 8v13h14v-13" /><rect x="8" y="13" width="4" height="8" /><rect x="14" y="11" width="5" height="5" /><path d="M15.5 12.5v2a0.5 0.5 0 0 1 -0.5 0.5" strokeWidth="1.5" /><path d="M17 12.5l0.5 2.5l0.5 -2.5l0.5 2.5l0.5 -2.5" strokeWidth="1.5" />
+                </svg>
+            ),
+            Calendar: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>,
+            FileText: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>,
+            Image: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>,
+            Lock: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>,
+            Plus: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
+            X: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
+            Trash2: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>,
+            Edit2: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>,
+            CheckCircle: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>,
+            ChevronRight: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="9 18 15 12 9 6"></polyline></svg>,
+            Pin: ({ className, fill }) => <svg viewBox="0 0 24 24" fill={fill || "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>,
+            Shield: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>,
+            Users: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>,
+            Download: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>,
+            Maximize2: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>,
+            Minimize2: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>,
+            AlertTriangle: ({ className }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        };
+
+        // --- 2. Configuration & Logic ---
         
-        import { initializeApp } from 'firebase/app';
-        import { 
-            getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query 
-        } from 'firebase/firestore';
-        import { 
-            getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken 
-        } from 'firebase/auth';
+        // [설정 완료] 제공된 Firebase Config 적용
+        const firebaseConfig = {
+            apiKey: "AIzaSyAtOwsAO19kLCAzxWvnijtwkPjQh1LXxgk",
+            authDomain: "dashboard-9d8e7.firebaseapp.com",
+            projectId: "dashboard-9d8e7",
+            storageBucket: "dashboard-9d8e7.firebasestorage.app",
+            messagingSenderId: "589082334454",
+            appId: "1:589082334454:web:e17088c9140d3004e308d7",
+            measurementId: "G-0Y23X0L4Z8"
+        };
+        const appId = 'senior-friendly-board';
 
-        // -----------------------------------------------------------
-        // [시스템] Firebase 초기화 (환경 변수 사용)
-        // -----------------------------------------------------------
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'senior-friendly-board';
+        // Firebase Init (Compat)
+        let app, auth, db;
+        try {
+            if (!firebase.apps.length) {
+                app = firebase.initializeApp(firebaseConfig);
+            } else {
+                app = firebase.app();
+            }
+            auth = firebase.auth();
+            db = firebase.firestore();
+        } catch (e) {
+            console.error("Firebase Init Error:", e);
+        }
 
-        // --- 커스텀 아이콘 (왕국회관) ---
-        const KingdomHallIcon = ({ size = 24, className }) => (
-            <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-                <path d="M2 8h20" />
-                <path d="M5 8v13h14v-13" />
-                <rect x="8" y="13" width="4" height="8" />
-                <rect x="14" y="11" width="5" height="5" />
-                <path d="M15.5 12.5v2a0.5 0.5 0 0 1 -0.5 0.5" strokeWidth="1.5" />
-                <path d="M17 12.5l0.5 2.5l0.5 -2.5l0.5 2.5l0.5 -2.5" strokeWidth="1.5" />
-            </svg>
-        );
-
-        // --- 유틸리티 ---
+        // Utils
         const compressImage = (file) => {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -89,18 +96,18 @@
                     img.src = event.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 1200; // 해상도 상향 조정
+                        const MAX_WIDTH = 800; // Small size for Firestore
                         const scaleSize = MAX_WIDTH / img.width;
                         const finalScale = scaleSize < 1 ? scaleSize : 1;
                         canvas.width = img.width * finalScale;
                         canvas.height = img.height * finalScale;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.7)); // 품질 조정
+                        resolve(canvas.toDataURL('image/jpeg', 0.6)); // 60% quality
                     };
-                    img.onerror = (err) => reject(err);
+                    img.onerror = reject;
                 };
-                reader.onerror = (err) => reject(err);
+                reader.onerror = reject;
             });
         };
 
@@ -109,7 +116,7 @@
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
                 reader.onload = () => resolve(reader.result);
-                reader.onerror = (err) => reject(err);
+                reader.onerror = reject;
             });
         };
 
@@ -120,291 +127,247 @@
             return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${days[date.getDay()]}`;
         };
 
+        // --- 3. React Components ---
+
         function App() {
-            const [user, setUser] = useState(null);
-            const [documents, setDocuments] = useState([]);
-            const [events, setEvents] = useState([]);
-            const [loginState, setLoginState] = useState('logged_out'); 
-            const [passwordInput, setPasswordInput] = useState('');
-            const [loginError, setLoginError] = useState('');
+            const [user, setUser] = React.useState(null);
+            const [documents, setDocuments] = React.useState([]);
+            const [events, setEvents] = React.useState([]);
+            const [loginState, setLoginState] = React.useState('logged_out');
+            const [passwordInput, setPasswordInput] = React.useState('');
+            const [loginError, setLoginError] = React.useState('');
+            const [activeDoc, setActiveDoc] = React.useState(null);
+            const [viewMode, setViewMode] = React.useState('normal');
+            const [isMobile, setIsMobile] = React.useState(false);
+            const [currentTime, setCurrentTime] = React.useState('');
+            const [isEditMode, setIsEditMode] = React.useState(false);
+            const [editTab, setEditTab] = React.useState('notice');
+            const [editingDoc, setEditingDoc] = React.useState(null);
+            const [editingEvent, setEditingEvent] = React.useState(null);
+            const [isProcessing, setIsProcessing] = React.useState(false);
+            const [showAllEvents, setShowAllEvents] = React.useState(false);
 
-            const [activeDoc, setActiveDoc] = useState(null);
-            const [viewMode, setViewMode] = useState('normal'); 
-            const [isMobile, setIsMobile] = useState(false);
-            const [currentTime, setCurrentTime] = useState('');
-
-            const [isEditMode, setIsEditMode] = useState(false);
-            const [editTab, setEditTab] = useState('notice');
-            const [editingDoc, setEditingDoc] = useState(null);
-            const [editingEvent, setEditingEvent] = useState(null);
-            const [isProcessing, setIsProcessing] = useState(false);
-
-            const [showAllEvents, setShowAllEvents] = useState(false);
-
-            // [인증] 초기화 및 상태 감지
-            useEffect(() => {
-                const initAuth = async () => {
-                    try {
-                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                            await signInWithCustomToken(auth, __initial_auth_token);
-                        } else {
-                            await signInAnonymously(auth);
-                        }
-                    } catch (error) {
-                        console.error("Auth failed:", error);
-                    }
-                };
-                initAuth();
-                const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
-                return () => unsubscribe();
-            }, []);
-
-            // [시간] 실시간 시계
-            useEffect(() => {
+            // Auth & Init with Robust Error Handling
+            React.useEffect(() => {
+                if(!auth) {
+                    setLoginError("Firebase 초기화 실패: 설정값을 확인해주세요.");
+                    return;
+                }
+                const unsub = auth.onAuthStateChanged(u => setUser(u));
+                auth.signInAnonymously().catch(e => {
+                    console.error("Auth Error:", e);
+                    let msg = "로그인 실패";
+                    if (e.code === 'auth/operation-not-allowed') msg = "Firebase Console에서 '익명 로그인'을 활성화해주세요.";
+                    else if (e.code === 'auth/configuration-not-found') msg = "Firebase Console에서 Authentication을 시작하고 익명 로그인을 켜주세요.";
+                    else msg = e.message;
+                    setLoginError(msg);
+                });
+                
                 const timer = setInterval(() => {
                     const now = new Date();
                     setCurrentTime(`${now.getMonth() + 1}월 ${now.getDate()}일`);
                 }, 1000);
-                return () => clearInterval(timer);
+                
+                const checkMobile = () => setIsMobile(window.innerWidth < 768);
+                checkMobile();
+                window.addEventListener('resize', checkMobile);
+
+                return () => { unsub(); clearInterval(timer); window.removeEventListener('resize', checkMobile); };
             }, []);
 
-            // [데이터] Firestore 구독
-            useEffect(() => {
-                if (!user) return;
-                
-                // 공지사항
-                const noticeRef = collection(db, 'artifacts', appId, 'public', 'data', 'notice_board');
-                const unsubNotice = onSnapshot(noticeRef, (snapshot) => {
+            // Data Fetching
+            React.useEffect(() => {
+                if (!user || !db) return;
+
+                // Notices
+                const noticeRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('notice_board');
+                const unsubNotice = noticeRef.onSnapshot(snapshot => {
                     let docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                    // 필터링: 전도인은 장로 전용 제외
                     if (loginState === 'publisher') {
                         docs = docs.filter(doc => doc.targetAudience !== 'elder');
                     }
-                    // 정렬: 고정 게시물 우선 -> 최신순
                     docs.sort((a, b) => {
-                        if (!!a.isPinned === !!b.isPinned) {
-                            return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
-                        }
-                        return a.isPinned ? -1 : 1;
+                        // 1. Pinned
+                        if (!!a.isPinned !== !!b.isPinned) return a.isPinned ? -1 : 1;
+                        // 2. Newest
+                        return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
                     });
                     setDocuments(docs);
-                }, (err) => console.log("Notice Error", err));
+                });
 
-                // 일정
-                const schedRef = collection(db, 'artifacts', appId, 'public', 'data', 'schedule_board');
-                const unsubSched = onSnapshot(schedRef, (snapshot) => {
+                // Events
+                const schedRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('schedule_board');
+                const unsubSched = schedRef.onSnapshot(snapshot => {
                     let evts = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                    // 정렬: 날짜순
                     evts.sort((a, b) => new Date(a.date) - new Date(b.date));
-                    // 필터링: 지난 일정 제외 (옵션)
+                    
                     const today = new Date().toISOString().split('T')[0];
-                    evts = evts.filter(e => e.date >= today);
+                    evts = evts.filter(e => e.date >= today); // Auto-hide past events
                     setEvents(evts);
-                }, (err) => console.log("Schedule Error", err));
+                });
 
                 return () => { unsubNotice(); unsubSched(); };
             }, [user, loginState]);
 
-            useEffect(() => {
-                const checkMobile = () => setIsMobile(window.innerWidth < 768);
-                checkMobile();
-                window.addEventListener('resize', checkMobile);
-                return () => window.removeEventListener('resize', checkMobile);
-            }, []);
-
-            // --- Handlers ---
+            // Handlers
             const handleLogin = (e) => {
                 e.preventDefault();
-                // 패스워드 로직 (클라이언트 사이드 게이트)
-                if (passwordInput === '1935') {
-                    setLoginState('publisher'); setLoginError('');
-                } else if (passwordInput === '00191400') {
-                    setLoginState('elder'); setLoginError('');
-                } else if (passwordInput === 'givemecourage') {
-                    setLoginState('admin'); setLoginError('');
-                } else {
-                    setLoginError('비밀번호가 올바르지 않습니다.'); setPasswordInput('');
-                }
+                if (passwordInput === '1935') { setLoginState('publisher'); setLoginError(''); }
+                else if (passwordInput === '00191400') { setLoginState('elder'); setLoginError(''); }
+                else if (passwordInput === '2026306833') { setLoginState('admin'); setLoginError(''); }
+                else { setLoginError('비밀번호가 올바르지 않습니다.'); setPasswordInput(''); }
             };
 
             const handleDelete = async (e, docId, collectionName) => {
                 e.stopPropagation();
-                if (!window.confirm('정말 삭제하시겠습니까?')) return;
-                if (!user) return;
+                if (!confirm('정말 삭제하시겠습니까?')) return;
                 try {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', collectionName, docId));
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection(collectionName).doc(docId).delete();
                     if (collectionName === 'notice_board' && activeDoc?.id === docId) setActiveDoc(null);
                 } catch (err) { alert('삭제 실패'); }
             };
 
             const handleTogglePin = async (e, docData) => {
                 e.stopPropagation();
-                if (!user) return;
                 try {
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'notice_board', docData.id);
-                    await updateDoc(docRef, { isPinned: !docData.isPinned });
+                    await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('notice_board').doc(docData.id).update({
+                        isPinned: !docData.isPinned
+                    });
                 } catch (err) { alert('고정 실패'); }
             };
 
             const handleFileChange = async (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
-                // 용량 제한 체크
-                if (file.size > 5 * 1024 * 1024) { alert('파일 크기는 5MB 이하여야 합니다.'); return; }
-
+                if (file.size > 10 * 1024 * 1024) { alert('파일이 너무 큽니다 (10MB 제한)'); return; }
+                
                 setIsProcessing(true);
                 try {
-                    let base64String = "";
-                    let fileType = "image";
+                    let url = "", type = "image";
                     if (file.type.includes('image')) {
-                        base64String = await compressImage(file); fileType = "image";
-                    } else if (file.type.includes('pdf')) {
-                        if (file.size > 2 * 1024 * 1024) { alert('PDF는 2MB 이하여야 합니다.'); setIsProcessing(false); return; }
-                        base64String = await readFileAsBase64(file); fileType = "pdf";
+                        url = await compressImage(file);
                     } else {
-                        alert('이미지나 PDF만 가능합니다.'); setIsProcessing(false); return;
+                        if (file.size > 1.5 * 1024 * 1024) { alert('PDF는 1.5MB 이하여야 합니다.'); setIsProcessing(false); return; }
+                        url = await readFileAsBase64(file);
+                        type = "pdf";
                     }
-                    setEditingDoc(prev => ({
-                        ...prev, url: base64String, type: fileType, fileName: file.name, title: prev.title || file.name.replace(/\.[^/.]+$/, "")
-                    }));
+                    setEditingDoc(p => ({ ...p, url, type, fileName: file.name, title: p.title || file.name.replace(/\.[^/.]+$/, "") }));
                 } catch (err) { alert('파일 처리 오류'); } finally { setIsProcessing(false); }
             };
 
             const handleSave = async (e) => {
                 e.preventDefault();
-                if (!user) { alert("로그인이 필요합니다."); return; }
                 setIsProcessing(true);
                 try {
                     if (editTab === 'notice') {
                         if (!editingDoc.title || !editingDoc.url || !editingDoc.targetAudience) {
-                            alert('필수 정보를 입력해주세요.'); setIsProcessing(false); return;
+                            alert('필수 항목을 모두 입력해주세요.'); setIsProcessing(false); return;
                         }
-                        const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'notice_board');
-                        const docData = { ...editingDoc, updatedAt: serverTimestamp() };
-                        if (editingDoc.id) {
-                            const { id, ...updateData } = docData;
-                            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'notice_board', editingDoc.id), updateData);
-                        } else {
-                            await addDoc(collectionRef, { ...docData, createdAt: serverTimestamp() });
-                        }
+                        const col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('notice_board');
+                        const data = { ...editingDoc, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+                        if (editingDoc.id) await col.doc(editingDoc.id).update(data);
+                        else await col.add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                     } else {
                         if (!editingEvent.title || !editingEvent.date) {
-                            alert('필수 정보를 입력해주세요.'); setIsProcessing(false); return;
+                            alert('필수 항목을 모두 입력해주세요.'); setIsProcessing(false); return;
                         }
-                        const collectionRef = collection(db, 'artifacts', appId, 'public', 'data', 'schedule_board');
-                        const evtData = { ...editingEvent, updatedAt: serverTimestamp() };
-                        await addDoc(collectionRef, { ...evtData, createdAt: serverTimestamp() });
+                        const col = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('schedule_board');
+                        const data = { ...editingEvent, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+                        await col.add({ ...data, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                     }
-                    setIsEditMode(false);
-                    setEditingDoc(null);
-                    setEditingEvent(null);
+                    setIsEditMode(false); setEditingDoc(null); setEditingEvent(null);
                 } catch (err) {
-                    if (err.message.includes("larger than")) {
-                        alert("파일 용량이 너무 큽니다. (1MB 제한)");
-                    } else {
-                        alert('저장 실패: ' + err.message);
-                    }
-                } finally {
-                    setIsProcessing(false);
-                }
-            };
-
-            const getViewerStyles = () => {
-                const baseStyle = "fixed transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1) bg-white shadow-2xl overflow-hidden border border-slate-200 z-50 flex flex-col";
-                if (viewMode === 'minimized') {
-                    return isMobile 
-                        ? `${baseStyle} bottom-0 left-0 right-0 h-20 rounded-t-2xl border-t-2 border-[#4A6FA5]`
-                        : `${baseStyle} bottom-6 right-6 w-96 h-20 rounded-2xl border-2`;
-                }
-                if (viewMode === 'fullscreen') { return `${baseStyle} inset-0 rounded-none`; }
-                if (isMobile) { return `${baseStyle} bottom-0 left-0 right-0 h-[92vh] rounded-t-3xl shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)]`; }
-                else { return `${baseStyle} bottom-8 right-8 w-[650px] h-[85vh] max-h-[900px] rounded-2xl shadow-2xl`; }
+                    if(err.message.includes("larger than")) alert("파일 용량이 너무 큽니다.");
+                    else alert('저장 실패: ' + err.message);
+                } finally { setIsProcessing(false); }
             };
 
             const eventLimit = loginState === 'admin' ? 5 : 3;
 
-            // [화면 1: 로그인]
+            // Views
             if (loginState === 'logged_out') {
                 return (
-                    <div className="min-h-screen relative flex items-center justify-center p-6 bg-[#F0F2F5]">
-                        <div className="bg-white rounded-3xl shadow-lg border border-slate-100 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-500">
-                            <div className="p-8 flex flex-col items-center">
-                                <div className="bg-[#4A6FA5] text-white p-5 rounded-full mb-6 shadow-md transform scale-110">
-                                    <KingdomHallIcon size={40} />
-                                </div>
-                                <h2 className="text-2xl font-bold text-[#2C3E50] mb-1">거창 회중 게시판</h2>
-                                <p className="text-sm text-slate-500 font-medium mb-8">- 계획표 및 일정 확인 -</p>
-                                <form onSubmit={handleLogin} className="w-full space-y-4">
-                                    <div className="space-y-2">
-                                        <input type="password" inputMode="numeric" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} placeholder="비밀번호 입력" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-center text-lg font-bold text-slate-700 placeholder:text-slate-400 focus:ring-2 focus:ring-[#4A6FA5] focus:bg-white transition-all outline-none" autoFocus />
-                                    </div>
-                                    {loginError && <div className="text-red-500 text-xs font-bold text-center bg-red-50 py-2 rounded-lg">{loginError}</div>}
-                                    <button type="submit" className="w-full bg-[#4A6FA5] hover:bg-[#3B5B8C] text-white py-3.5 rounded-xl font-bold text-lg shadow-md transition-all active:scale-95 flex items-center justify-center gap-2">시작</button>
-                                </form>
-                                <div className="mt-6 flex flex-col items-center gap-2 text-xs text-slate-400 font-medium bg-slate-50 p-3 rounded-lg w-full">
-                                    <div className="flex items-center gap-1"><Lock size={12} /> 관리자로부터 받은 비밀번호를 입력하세요</div>
-                                </div>
+                    <div className="min-h-screen flex items-center justify-center p-6 bg-[#F0F2F5]">
+                        <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm overflow-hidden p-8 flex flex-col items-center">
+                            <div className="bg-[#4A6FA5] text-white p-5 rounded-full mb-6 shadow-lg shadow-blue-200">
+                                <Icons.KingdomHall className="w-10 h-10" />
                             </div>
-                            <div className="h-1.5 w-full bg-gradient-to-r from-[#4A6FA5] to-[#6B8E23]" />
+                            <h2 className="text-2xl font-bold text-[#2C3E50] mb-2">거창 회중 게시판</h2>
+                            <p className="text-sm text-slate-500 font-medium mb-8">- 계획표 및 일정 확인 -</p>
+                            <form onSubmit={handleLogin} className="w-full space-y-4">
+                                <input type="password" inputMode="numeric" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)} placeholder="비밀번호 입력" className="w-full bg-slate-50 border-2 border-slate-100 rounded-xl px-4 py-3.5 text-center text-lg font-bold text-slate-700 focus:border-[#4A6FA5] focus:bg-white outline-none transition-all" autoFocus />
+                                {loginError && (
+                                    <div className="bg-red-50 p-3 rounded-lg flex items-center gap-2 text-red-500 text-xs font-bold text-left w-full border border-red-100">
+                                        <Icons.AlertTriangle className="w-4 h-4 shrink-0" />
+                                        <span>{loginError}</span>
+                                    </div>
+                                )}
+                                <button type="submit" className="w-full bg-[#4A6FA5] hover:bg-[#3B5B8C] text-white py-3.5 rounded-xl font-bold text-lg shadow-lg shadow-blue-100 transition-all active:scale-95">시작</button>
+                            </form>
+                            <div className="mt-8 flex items-center gap-2 text-xs text-slate-400 font-medium">
+                                <Icons.Lock className="w-3 h-3" /> 관리자로부터 받은 비밀번호를 입력하세요
+                            </div>
                         </div>
                     </div>
                 );
             }
 
-            // [화면 2: 메인]
             return (
-                <div className="min-h-screen bg-[#F0F2F5] text-slate-800 pb-32 font-sans">
-                    <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
-                        <div className="px-5 py-5 flex justify-between items-center max-w-6xl mx-auto">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                                <h1 className="text-2xl md:text-3xl font-extrabold text-[#2C3E50] tracking-tight flex items-center gap-3">
-                                    <span className="bg-[#4A6FA5] text-white p-2 rounded-xl shadow-sm"><KingdomHallIcon size={32} /></span>
-                                    게시판
-                                </h1>
-                                <div className="flex items-center">
-                                    {loginState === 'admin' && <span className="text-sm font-bold bg-red-100 text-red-600 px-3 py-1 rounded-full border border-red-200">관리자 모드</span>}
-                                    {loginState === 'elder' && <span className="text-sm font-bold bg-purple-100 text-purple-600 px-3 py-1 rounded-full border border-purple-200">장로</span>}
-                                    {loginState === 'publisher' && <span className="text-sm font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200">전도인</span>}
+                <div className="h-full flex flex-col font-sans">
+                    {/* Header */}
+                    <header className="bg-white border-b border-slate-200 shrink-0 z-20 sticky top-0 safe-top">
+                        <div className="px-5 py-4 flex justify-between items-center max-w-6xl mx-auto">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-[#4A6FA5] text-white p-2 rounded-xl shadow-sm">
+                                    <Icons.KingdomHall className="w-6 h-6" />
+                                </div>
+                                <div className="flex flex-col">
+                                    <h1 className="text-xl font-extrabold text-[#2C3E50] leading-none">게시판</h1>
+                                    <div className="flex gap-1 mt-1">
+                                        {loginState === 'admin' && <span className="text-[10px] font-bold bg-red-100 text-red-600 px-2 py-0.5 rounded-full">관리자</span>}
+                                        {loginState === 'elder' && <span className="text-[10px] font-bold bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">장로</span>}
+                                        {loginState === 'publisher' && <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">전도인</span>}
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-3 md:gap-4">
-                                <span className="text-sm md:text-base font-bold text-slate-600 bg-slate-100 px-4 py-2 rounded-xl hidden sm:block shadow-sm border border-slate-200">{currentTime}</span>
-                                <button onClick={() => setLoginState('logged_out')} className="text-sm font-bold text-slate-500 hover:text-[#4A6FA5] hover:bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl transition-all active:scale-95">나가기</button>
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm font-bold text-slate-500 hidden sm:block bg-slate-100 px-3 py-1.5 rounded-lg">{currentTime}</span>
+                                <button onClick={() => setLoginState('logged_out')} className="text-sm font-bold text-slate-500 hover:text-[#4A6FA5] border border-slate-200 px-3 py-2 rounded-lg transition-colors">나가기</button>
                             </div>
                         </div>
                     </header>
 
-                    <main className="max-w-6xl mx-auto p-4 md:p-8 space-y-8 animate-fade-in">
-                        {/* 1. Event Section */}
+                    {/* Main Content */}
+                    <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 max-w-6xl mx-auto w-full pb-24 safe-bottom">
+                        
+                        {/* 1. Events Section */}
                         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                                 <h2 className="text-lg font-extrabold text-[#2C3E50] flex items-center gap-2">
-                                    <Calendar size={20} className="text-[#4A6FA5]" />
-                                    예정된 이벤트
+                                    <Icons.Calendar className="w-5 h-5 text-[#4A6FA5]" /> 예정된 이벤트
                                 </h2>
                                 {events.length > eventLimit && (
                                     <button onClick={() => setShowAllEvents(true)} className="text-sm font-bold text-slate-500 hover:text-[#4A6FA5] flex items-center gap-1">
-                                        더보기 <ChevronRight size={14} />
+                                        더보기 <Icons.ChevronRight className="w-4 h-4" />
                                     </button>
                                 )}
                             </div>
-                            
                             <div className="divide-y divide-slate-100">
                                 {events.length === 0 ? (
-                                    <div className="p-8 text-center text-slate-400 text-sm font-medium">예정된 행사가 없습니다.</div>
+                                    <div className="p-8 text-center text-slate-400 text-sm">예정된 행사가 없습니다.</div>
                                 ) : (
-                                    events.slice(0, eventLimit).map((evt) => (
-                                        <div key={evt.id} className="px-6 py-4 hover:bg-slate-50 transition-colors flex justify-between items-start group">
+                                    events.slice(0, eventLimit).map(evt => (
+                                        <div key={evt.id} className="px-5 py-4 hover:bg-slate-50 transition-colors flex justify-between items-start group">
                                             <div className="flex-1">
-                                                <div className="text-sm text-slate-500 font-medium mb-1 flex items-center gap-2">
+                                                <div className="text-xs font-bold text-slate-500 mb-1 flex items-center gap-2">
                                                     {formatDateFriendly(evt.date)}
                                                     {evt.date === new Date().toISOString().split('T')[0] && <span className="bg-red-100 text-red-600 text-[10px] px-1.5 py-0.5 rounded font-bold">오늘</span>}
                                                 </div>
-                                                <h3 className="text-lg font-bold text-[#4A6FA5]">{evt.title}</h3>
-                                                {evt.desc && <p className="text-sm text-slate-600 mt-1">{evt.desc}</p>}
+                                                <h3 className="text-base font-bold text-[#4A6FA5]">{evt.title}</h3>
+                                                {evt.desc && <p className="text-xs text-slate-600 mt-1 line-clamp-1">{evt.desc}</p>}
                                             </div>
                                             {loginState === 'admin' && (
-                                                <button onClick={(e) => handleDelete(e, evt.id, 'schedule_board')} className="text-slate-300 hover:text-red-500 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={16} /></button>
+                                                <button onClick={(e) => handleDelete(e, evt.id, 'schedule_board')} className="text-slate-300 hover:text-red-500 p-2"><Icons.Trash2 className="w-4 h-4" /></button>
                                             )}
                                         </div>
                                     ))
@@ -415,58 +378,44 @@
                         {/* 2. Board Section */}
                         <section>
                             <div className="mb-4 flex items-center gap-2 px-1">
-                                <FileText size={20} className="text-[#4A6FA5]" />
+                                <Icons.FileText className="w-5 h-5 text-[#4A6FA5]" />
                                 <h2 className="text-lg font-extrabold text-[#2C3E50]">게시판</h2>
                             </div>
-
                             {documents.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-16 text-slate-400 bg-white rounded-2xl border border-slate-200 border-dashed shadow-sm">
-                                    <FileText size={32} className="mb-2 text-slate-300" />
-                                    <p className="font-bold">게시물이 없습니다</p>
+                                <div className="py-16 text-center text-slate-400 bg-white rounded-2xl border border-slate-200 border-dashed">
+                                    <p>게시물이 없습니다.</p>
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                                    {documents.map((doc) => (
-                                        <div 
-                                            key={doc.id}
-                                            onClick={() => { setActiveDoc(doc); setViewMode('normal'); }}
-                                            className={`
-                                                group relative bg-white rounded-xl overflow-hidden border shadow-sm 
-                                                hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer
-                                                ${activeDoc?.id === doc.id ? 'ring-2 ring-[#4A6FA5] ring-offset-2' : ''}
-                                                ${doc.isPinned ? 'border-[#4A6FA5] ring-1 ring-[#4A6FA5]/20' : 'border-slate-100'}
-                                            `}
-                                        >
-                                            <div className="aspect-video bg-slate-100 relative overflow-hidden">
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-5">
+                                    {documents.map(doc => (
+                                        <div key={doc.id} onClick={() => { setActiveDoc(doc); setViewMode('normal'); }} 
+                                            className={`relative bg-white rounded-xl overflow-hidden border shadow-sm cursor-pointer active:scale-95 transition-transform ${activeDoc?.id === doc.id ? 'ring-2 ring-[#4A6FA5]' : 'border-slate-100'} ${doc.isPinned ? 'ring-1 ring-[#4A6FA5]/30' : ''}`}>
+                                            <div className="aspect-[16/9] bg-slate-100 relative">
                                                 {doc.type === 'pdf' ? (
-                                                    <div className="w-full h-full flex flex-col items-center justify-center bg-slate-50 text-[#4A6FA5]">
-                                                        <FileText size={32} />
-                                                        <span className="mt-1 font-bold text-[10px] bg-white px-1.5 py-0.5 rounded shadow-sm">PDF</span>
+                                                    <div className="w-full h-full flex flex-col items-center justify-center text-[#4A6FA5]">
+                                                        <Icons.FileText className="w-8 h-8" />
+                                                        <span className="mt-1 text-[10px] font-bold bg-white px-1.5 py-0.5 rounded shadow-sm">PDF</span>
                                                     </div>
                                                 ) : (
-                                                    <img src={doc.url} alt={doc.title} className="w-full h-full object-cover" loading="lazy" />
+                                                    <img src={doc.url} className="w-full h-full object-cover" loading="lazy" />
                                                 )}
                                                 <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-md px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-sm text-slate-700 flex items-center gap-1">
                                                     <span className="w-1 h-1 rounded-full bg-[#6B8E23]" />{doc.date}
                                                 </div>
-                                                {doc.targetAudience === 'elder' && (
-                                                    <div className="absolute top-2 right-2 bg-purple-600 text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-md z-10 flex items-center gap-0.5"><Shield size={8} /> 장로</div>
-                                                )}
-                                                {doc.isPinned && doc.targetAudience !== 'elder' && (
-                                                    <div className="absolute top-2 right-2 bg-[#4A6FA5] text-white p-1 rounded-full shadow-lg z-10"><Pin size={10} fill="currentColor" /></div>
-                                                )}
+                                                {doc.targetAudience === 'elder' && <div className="absolute top-2 right-2 bg-purple-600 text-white px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-md z-10 flex gap-0.5"><Icons.Shield className="w-3 h-3" /> 장로</div>}
+                                                {doc.isPinned && doc.targetAudience !== 'elder' && <div className="absolute top-2 right-2 bg-[#4A6FA5] text-white p-1 rounded-full shadow-lg z-10"><Icons.Pin className="w-3 h-3" fill="currentColor" /></div>}
                                             </div>
-                                            <div className={`p-3 ${doc.isPinned ? 'bg-blue-50/10' : ''}`}>
+                                            <div className={`p-3 ${doc.isPinned ? 'bg-blue-50/20' : ''}`}>
                                                 <div className="flex items-center gap-1 mb-1">
                                                     {doc.isPinned && <span className="text-[9px] font-bold bg-[#4A6FA5] text-white px-1 py-0.5 rounded shrink-0">공지</span>}
                                                     <h3 className="text-sm font-bold text-[#2C3E50] leading-tight truncate">{doc.title}</h3>
                                                 </div>
                                             </div>
                                             {loginState === 'admin' && (
-                                                <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20 bg-black/5 p-1 rounded-lg backdrop-blur-sm">
-                                                    <button onClick={(e) => handleTogglePin(e, doc)} className={`p-1.5 rounded-md shadow-sm backdrop-blur ${doc.isPinned ? 'bg-[#4A6FA5] text-white' : 'bg-white text-slate-600 hover:text-[#4A6FA5]'}`}><Pin size={16} fill={doc.isPinned ? "currentColor" : "none"} /></button>
-                                                    <button onClick={(e) => { e.stopPropagation(); setEditingDoc(doc); setEditTab('notice'); setIsEditMode(true); }} className="bg-white text-slate-600 p-1.5 rounded-md shadow-sm hover:text-[#4A6FA5]"><Edit2 size={16} /></button>
-                                                    <button onClick={(e) => handleDelete(e, doc.id, 'notice_board')} className="bg-white text-slate-600 p-1.5 rounded-md shadow-sm hover:text-red-500 hover:bg-red-50"><Trash2 size={16} /></button>
+                                                <div className="absolute top-1 right-1 flex gap-1 bg-black/10 p-1 rounded-lg backdrop-blur-sm opacity-0 hover:opacity-100 transition-opacity">
+                                                    <button onClick={(e) => handleTogglePin(e, doc)} className={`p-1.5 rounded bg-white shadow-sm ${doc.isPinned ? 'text-[#4A6FA5]' : 'text-slate-500'}`}><Icons.Pin className="w-4 h-4" fill={doc.isPinned ? "currentColor" : "none"} /></button>
+                                                    <button onClick={(e) => { e.stopPropagation(); setEditingDoc(doc); setEditTab('notice'); setIsEditMode(true); }} className="p-1.5 rounded bg-white shadow-sm text-slate-500 hover:text-[#4A6FA5]"><Icons.Edit2 className="w-4 h-4" /></button>
+                                                    <button onClick={(e) => handleDelete(e, doc.id, 'notice_board')} className="p-1.5 rounded bg-white shadow-sm text-slate-500 hover:text-red-500"><Icons.Trash2 className="w-4 h-4" /></button>
                                                 </div>
                                             )}
                                         </div>
@@ -476,138 +425,135 @@
                         </section>
                     </main>
 
-                    {/* Floating Action Button (Admin Only) */}
+                    {/* Admin FAB */}
                     {loginState === 'admin' && (
-                        <button
-                            onClick={() => {
-                                setEditingDoc({ title: '', type: 'image', desc: '', url: '', fileName: '', date: new Date().toISOString().split('T')[0], targetAudience: null });
-                                setEditingEvent({ title: '', date: new Date().toISOString().split('T')[0], desc: '' });
-                                setIsEditMode(true);
-                                setEditTab('notice');
-                            }}
-                            className="fixed bottom-8 right-6 md:right-10 z-30 bg-[#2C3E50] text-white p-4 rounded-full shadow-2xl hover:bg-[#1a252f] hover:scale-110 active:scale-95 transition-all"
-                        >
-                            <Plus size={28} />
+                        <button onClick={() => { 
+                            setEditingDoc({ title: '', type: 'image', desc: '', url: '', fileName: '', date: new Date().toISOString().split('T')[0], targetAudience: null });
+                            setEditingEvent({ title: '', date: new Date().toISOString().split('T')[0], desc: '' });
+                            setIsEditMode(true); setEditTab('notice'); 
+                        }} className="fixed bottom-6 right-6 z-30 bg-[#2C3E50] text-white p-4 rounded-full shadow-xl hover:scale-105 active:scale-95 transition-transform">
+                            <Icons.Plus className="w-7 h-7" />
                         </button>
                     )}
 
-                    {/* Modal: Edit/Add */}
-                    {isEditMode && (
-                        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-                            <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-                                <div className="flex border-b border-slate-100 sticky top-0 z-10 bg-white">
-                                    <button onClick={() => setEditTab('notice')} className={`flex-1 py-4 font-bold text-sm flex items-center justify-center gap-2 transition-colors ${editTab === 'notice' ? 'text-[#4A6FA5] border-b-2 border-[#4A6FA5] bg-blue-50/20' : 'text-slate-400 hover:text-slate-600'}`}><ImageIcon size={18} /> 게시물 (사진/문서)</button>
-                                    <button onClick={() => setEditTab('event')} className={`flex-1 py-4 font-bold text-sm flex items-center justify-center gap-2 transition-colors ${editTab === 'event' ? 'text-[#4A6FA5] border-b-2 border-[#4A6FA5] bg-blue-50/20' : 'text-slate-400 hover:text-slate-600'}`}><Calendar size={18} /> 새 일정 추가</button>
+                    {/* View Modal (PiP) */}
+                    {activeDoc && (
+                        <div className={`fixed z-50 bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col transition-all duration-300 ease-out 
+                            ${viewMode === 'minimized' 
+                                ? (isMobile ? 'bottom-0 left-0 right-0 h-16 rounded-t-2xl border-t-2 border-[#4A6FA5]' : 'bottom-6 right-6 w-80 h-16 rounded-xl border-2')
+                                : (isMobile ? 'bottom-0 left-0 right-0 h-[92vh] rounded-t-2xl shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.3)]' : 'bottom-8 right-8 w-[600px] h-[85vh] rounded-2xl')
+                            }`}>
+                            
+                            {/* Header */}
+                            <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-slate-100 cursor-pointer" onClick={() => setViewMode(viewMode === 'minimized' ? 'normal' : 'minimized')}>
+                                <div className="flex items-center gap-3 overflow-hidden">
+                                    <div className="bg-[#4A6FA5] p-1.5 rounded-lg text-white shrink-0">
+                                        {activeDoc.type === 'pdf' ? <Icons.FileText className="w-4 h-4" /> : <Icons.Image className="w-4 h-4" />}
+                                    </div>
+                                    <h3 className="font-bold text-[#2C3E50] text-sm truncate">{activeDoc.title}</h3>
                                 </div>
-                                <form onSubmit={handleSave} className="p-6 space-y-5">
-                                    {editTab === 'notice' ? (
-                                        <>
-                                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                                                <label className="block text-sm font-bold text-[#2C3E50] mb-3 flex items-center gap-2"><Users size={16} /> 누가 볼 수 있나요? <span className="text-red-500">*</span></label>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <button type="button" onClick={() => setEditingDoc({...editingDoc, targetAudience: 'public'})} className={`p-3 rounded-xl text-sm font-bold flex flex-col items-center justify-center gap-1 transition-all ${editingDoc.targetAudience === 'public' ? 'bg-white border-2 border-[#4A6FA5] text-[#4A6FA5] shadow-md' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-100'}`}><Users size={20} /> 모두 (전도인)</button>
-                                                    <button type="button" onClick={() => setEditingDoc({...editingDoc, targetAudience: 'elder'})} className={`p-3 rounded-xl text-sm font-bold flex flex-col items-center justify-center gap-1 transition-all ${editingDoc.targetAudience === 'elder' ? 'bg-white border-2 border-purple-600 text-purple-600 shadow-md' : 'bg-white border border-slate-200 text-slate-400 hover:bg-slate-100'}`}><Shield size={20} /> 장로 전용</button>
-                                                </div>
+                                <div className="flex items-center gap-1 text-slate-400">
+                                    <button onClick={(e) => { e.stopPropagation(); setViewMode(viewMode === 'fullscreen' ? 'normal' : 'fullscreen'); }} className="p-2 hover:bg-slate-100 rounded-lg hidden md:block">
+                                        {viewMode === 'fullscreen' ? <Icons.Minimize2 className="w-4 h-4" /> : <Icons.Maximize2 className="w-4 h-4" />}
+                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); setActiveDoc(null); }} className="p-2 bg-slate-100 hover:bg-red-50 hover:text-red-500 rounded-lg text-slate-500"><Icons.X className="w-4 h-4" /></button>
+                                </div>
+                            </div>
+
+                            {/* Content */}
+                            <div className={`flex-1 bg-slate-50 relative overflow-hidden flex flex-col ${viewMode === 'minimized' ? 'hidden' : 'block'}`}>
+                                <div className="flex-1 overflow-auto flex items-center justify-center p-4">
+                                    {activeDoc.type === 'pdf' ? (
+                                        <object data={activeDoc.url} type="application/pdf" className="w-full h-full min-h-[50vh] bg-white rounded shadow-sm border border-slate-200">
+                                            <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                                                <Icons.FileText className="w-12 h-12 text-[#4A6FA5] mb-2" />
+                                                <p className="text-sm font-bold mb-4">미리보기 제한</p>
+                                                <a href={activeDoc.url} download={activeDoc.fileName} className="bg-[#4A6FA5] text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2"><Icons.Download className="w-4 h-4" /> 다운로드</a>
                                             </div>
-                                            <div className="relative">
-                                                <input type="file" accept="image/*,application/pdf" onChange={handleFileChange} disabled={isProcessing} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                                                <div className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all duration-300 ${editingDoc.url ? 'border-[#4A6FA5] bg-blue-50/30' : 'border-slate-300 bg-slate-50 hover:bg-slate-100'}`}>
-                                                    {isProcessing ? <div className="flex flex-col items-center text-[#4A6FA5]"><Loader size={32} className="animate-spin mb-2" /><span className="font-bold">처리 중...</span></div> : editingDoc.url ? <div className="flex items-center gap-3 w-full"><div className="w-16 h-16 bg-white rounded-lg shadow-sm overflow-hidden flex items-center justify-center border border-slate-200 shrink-0">{editingDoc.type === 'pdf' ? <FileText size={24} className="text-[#4A6FA5]" /> : <img src={editingDoc.url} className="w-full h-full object-cover" alt="preview" />}</div><div className="flex-1 min-w-0"><div className="text-green-600 font-bold text-sm flex items-center gap-1 mb-1"><CheckCircle size={14} /> 선택 완료</div><p className="text-xs text-slate-500 truncate">{editingDoc.fileName}</p></div></div> : <div className="flex flex-col items-center text-slate-400 py-4"><Upload size={32} className="text-slate-300 mb-2" /><span className="font-bold text-slate-600">사진 / 문서 추가</span></div>}
-                                                </div>
-                                            </div>
-                                            <div className="space-y-3">
-                                                <div><label className="block text-xs font-bold text-slate-500 mb-1.5 ml-1">제목</label><input type="text" required value={editingDoc.title} onChange={(e) => setEditingDoc({...editingDoc, title: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-base font-bold text-[#2C3E50] focus:ring-2 focus:ring-[#4A6FA5] outline-none" placeholder="제목을 입력하세요" /></div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div><label className="block text-xs font-bold text-slate-500 mb-1.5 ml-1">날짜</label><input type="date" required value={editingDoc.date} onChange={(e) => setEditingDoc({...editingDoc, date: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border-none rounded-xl font-bold text-[#2C3E50] focus:ring-2 focus:ring-[#4A6FA5] outline-none" /></div>
-                                                    <div><label className="block text-xs font-bold text-slate-500 mb-1.5 ml-1">설명 (선택)</label><input type="text" value={editingDoc.desc} onChange={(e) => setEditingDoc({...editingDoc, desc: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border-none rounded-xl text-[#2C3E50] focus:ring-2 focus:ring-[#4A6FA5] outline-none" placeholder="내용" /></div>
-                                                </div>
-                                            </div>
-                                        </>
+                                        </object>
                                     ) : (
-                                        <>
-                                            <div className="space-y-4 py-4">
-                                                <div className="bg-[#4A6FA5]/10 p-4 rounded-xl flex items-center gap-3">
-                                                    <Calendar className="text-[#4A6FA5]" size={24} />
-                                                    <div><h4 className="font-bold text-[#4A6FA5]">새로운 일정 추가</h4><p className="text-xs text-slate-500">순회 대회, 기념식 등 주요 행사를 입력하세요.</p></div>
-                                                </div>
-                                                <div><label className="block text-xs font-bold text-slate-500 mb-1.5 ml-1">행사명</label><input type="text" required value={editingEvent.title} onChange={(e) => setEditingEvent({...editingEvent, title: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-lg font-bold text-[#4A6FA5] focus:ring-2 focus:ring-[#4A6FA5] outline-none" placeholder="예: 순회 대회" /></div>
-                                                <div><label className="block text-xs font-bold text-slate-500 mb-1.5 ml-1">날짜</label><input type="date" required value={editingEvent.date} onChange={(e) => setEditingEvent({...editingEvent, date: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-[#4A6FA5] outline-none" /></div>
-                                                <div><label className="block text-xs font-bold text-slate-500 mb-1.5 ml-1">추가 정보 (선택)</label><input type="text" value={editingEvent.desc} onChange={(e) => setEditingEvent({...editingEvent, desc: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-slate-700 focus:ring-2 focus:ring-[#4A6FA5] outline-none" placeholder="장소, 시간 등 상세 정보" /></div>
-                                            </div>
-                                        </>
+                                        <img src={activeDoc.url} className="max-w-full max-h-full object-contain rounded shadow-lg" />
                                     )}
-                                    <div className="pt-2"><button type="submit" disabled={isProcessing || (editTab === 'notice' && !editingDoc.targetAudience)} className={`w-full py-4 rounded-xl font-bold text-lg flex justify-center items-center gap-2 transition-all shadow-lg active:scale-95 ${isProcessing || (editTab === 'notice' && !editingDoc.targetAudience) ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-[#2C3E50] hover:bg-[#1a252f] text-white'}`}><Save size={18} /> 등록하기</button></div>
-                                </form>
-                                <button onClick={() => setIsEditMode(false)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200 text-slate-500"><X size={20} /></button>
+                                </div>
+                                <div className="bg-white border-t border-slate-200 p-3 flex justify-between items-center shrink-0">
+                                    <span className="text-xs font-bold text-slate-500 truncate max-w-[150px]">{activeDoc.fileName}</span>
+                                    <a href={activeDoc.url} download={activeDoc.fileName || "download"} className="flex items-center gap-2 bg-[#F0F2F5] text-[#2C3E50] px-3 py-2 rounded-lg font-bold hover:bg-slate-200 transition-colors text-xs"><Icons.Download className="w-4 h-4" /> 저장하기</a>
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Modal: Show All Events */}
+                    {/* Edit Modal */}
+                    {isEditMode && (
+                        <div className="fixed inset-0 bg-slate-900/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+                            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                                <div className="flex border-b border-slate-100 bg-white">
+                                    <button onClick={() => setEditTab('notice')} className={`flex-1 py-4 font-bold text-sm flex items-center justify-center gap-2 ${editTab === 'notice' ? 'text-[#4A6FA5] border-b-2 border-[#4A6FA5] bg-blue-50/20' : 'text-slate-400'}`}><Icons.Image className="w-4 h-4" /> 게시물</button>
+                                    <button onClick={() => setEditTab('event')} className={`flex-1 py-4 font-bold text-sm flex items-center justify-center gap-2 ${editTab === 'event' ? 'text-[#4A6FA5] border-b-2 border-[#4A6FA5] bg-blue-50/20' : 'text-slate-400'}`}><Icons.Calendar className="w-4 h-4" /> 일정</button>
+                                </div>
+                                <div className="p-6 overflow-y-auto">
+                                    <form onSubmit={handleSave} className="space-y-5">
+                                        {editTab === 'notice' ? (
+                                            <>
+                                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                                    <label className="block text-xs font-bold text-[#2C3E50] mb-2 flex items-center gap-1"><Icons.Users className="w-3 h-3" /> 공개 대상 <span className="text-red-500">*</span></label>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <button type="button" onClick={() => setEditingDoc({...editingDoc, targetAudience: 'public'})} className={`p-3 rounded-lg text-xs font-bold flex flex-col items-center gap-1 ${editingDoc.targetAudience === 'public' ? 'bg-white border-2 border-[#4A6FA5] text-[#4A6FA5]' : 'bg-white border border-slate-200 text-slate-400'}`}><Icons.Users className="w-4 h-4" /> 전도인</button>
+                                                        <button type="button" onClick={() => setEditingDoc({...editingDoc, targetAudience: 'elder'})} className={`p-3 rounded-lg text-xs font-bold flex flex-col items-center gap-1 ${editingDoc.targetAudience === 'elder' ? 'bg-white border-2 border-purple-600 text-purple-600' : 'bg-white border border-slate-200 text-slate-400'}`}><Icons.Shield className="w-4 h-4" /> 장로 전용</button>
+                                                    </div>
+                                                </div>
+                                                <div className="relative">
+                                                    <input type="file" accept="image/*,application/pdf" onChange={handleFileChange} disabled={isProcessing} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                                                    <div className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center ${editingDoc.url ? 'border-[#4A6FA5] bg-blue-50/30' : 'border-slate-300 bg-slate-50'}`}>
+                                                        {isProcessing ? <div className="text-[#4A6FA5] font-bold text-xs">처리 중...</div> : editingDoc.url ? <div className="text-green-600 font-bold text-xs flex items-center gap-1"><Icons.CheckCircle className="w-4 h-4" /> 완료</div> : <div className="text-slate-400 text-xs flex flex-col items-center"><Icons.Upload className="w-6 h-6 mb-1" /> 파일 선택</div>}
+                                                    </div>
+                                                </div>
+                                                <input type="text" required value={editingDoc.title} onChange={(e) => setEditingDoc({...editingDoc, title: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-[#2C3E50] outline-none" placeholder="제목" />
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <input type="date" required value={editingDoc.date} onChange={(e) => setEditingDoc({...editingDoc, date: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-[#2C3E50] outline-none" />
+                                                    <input type="text" value={editingDoc.desc} onChange={(e) => setEditingDoc({...editingDoc, desc: e.target.value})} className="w-full px-3 py-3 bg-slate-50 border-none rounded-xl text-sm text-[#2C3E50] outline-none" placeholder="설명 (선택)" />
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <input type="text" required value={editingEvent.title} onChange={(e) => setEditingEvent({...editingEvent, title: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-lg font-bold text-[#4A6FA5] outline-none" placeholder="행사명 (예: 순회 대회)" />
+                                                <input type="date" required value={editingEvent.date} onChange={(e) => setEditingEvent({...editingEvent, date: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm font-bold text-slate-800 outline-none" />
+                                                <input type="text" value={editingEvent.desc} onChange={(e) => setEditingEvent({...editingEvent, desc: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl text-sm text-slate-700 outline-none" placeholder="장소 등 추가 정보" />
+                                            </>
+                                        )}
+                                        <button type="submit" disabled={isProcessing || (editTab === 'notice' && !editingDoc.targetAudience)} className="w-full py-4 rounded-xl font-bold text-lg bg-[#2C3E50] text-white hover:bg-[#1a252f] disabled:bg-slate-300 transition-colors flex items-center justify-center gap-2"><Icons.Save className="w-5 h-5" /> 등록하기</button>
+                                    </form>
+                                </div>
+                                <button onClick={() => setIsEditMode(false)} className="absolute top-3 right-3 p-2 bg-slate-100 rounded-full text-slate-500"><Icons.X className="w-5 h-5" /></button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Events List Modal */}
                     {showAllEvents && (
                         <div className="fixed inset-0 bg-slate-900/60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm">
-                            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col">
-                                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
-                                    <h3 className="font-extrabold text-lg text-[#2C3E50]">전체 일정 목록</h3>
-                                    <button onClick={() => setShowAllEvents(false)} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200"><X size={20} /></button>
+                            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
+                                <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+                                    <h3 className="font-extrabold text-lg text-[#2C3E50]">전체 일정</h3>
+                                    <button onClick={() => setShowAllEvents(false)} className="p-2 bg-slate-100 rounded-full"><Icons.X className="w-5 h-5" /></button>
                                 </div>
                                 <div className="overflow-y-auto p-4 space-y-2">
-                                    {events.map((evt) => (
+                                    {events.map(evt => (
                                         <div key={evt.id} className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                            <div className="text-sm font-bold text-slate-500 mb-1">{formatDateFriendly(evt.date)}</div>
-                                            <h4 className="text-lg font-bold text-[#4A6FA5]">{evt.title}</h4>
-                                            {evt.desc && <p className="text-sm text-slate-600 mt-1">{evt.desc}</p>}
+                                            <div className="text-xs font-bold text-slate-500 mb-1">{formatDateFriendly(evt.date)}</div>
+                                            <h4 className="text-base font-bold text-[#4A6FA5]">{evt.title}</h4>
+                                            {evt.desc && <p className="text-xs text-slate-600 mt-1">{evt.desc}</p>}
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         </div>
                     )}
-
-                    {/* Viewer */}
-                    {activeDoc && (
-                        <>
-                            {isMobile && viewMode === 'normal' && <div className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm transition-opacity" onClick={() => setViewMode('minimized')} />}
-                            <div className={getViewerStyles()}>
-                                <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-slate-100 cursor-pointer" onClick={() => setViewMode(viewMode === 'minimized' ? 'normal' : 'minimized')}>
-                                    <div className="flex items-center gap-3 overflow-hidden">
-                                        <div className="bg-[#4A6FA5] p-1.5 rounded-lg text-white shrink-0">{activeDoc.type === 'pdf' ? <FileText size={16} /> : <ImageIcon size={16} />}</div>
-                                        <h3 className="font-bold text-[#2C3E50] text-lg truncate pr-4">{activeDoc.title}</h3>
-                                        {activeDoc.targetAudience === 'elder' && <span className="text-[10px] font-bold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full border border-purple-200 shrink-0">장로 전용</span>}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-slate-400">
-                                        <button onClick={(e) => { e.stopPropagation(); setViewMode(viewMode === 'fullscreen' ? 'normal' : 'fullscreen'); }} className="p-2 hover:bg-slate-100 rounded-lg transition-colors hidden md:block">{viewMode === 'fullscreen' ? <Minimize2 size={20} /> : <Maximize2 size={20} />}</button>
-                                        <button onClick={(e) => { e.stopPropagation(); setActiveDoc(null); }} className="p-2 bg-slate-100 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors text-slate-600"><X size={20} /></button>
-                                    </div>
-                                </div>
-                                <div className={`flex-1 bg-slate-50 relative overflow-hidden flex flex-col ${viewMode === 'minimized' ? 'hidden' : 'block'}`}>
-                                    <div className="flex-1 overflow-auto w-full h-full flex items-center justify-center p-4">
-                                        {activeDoc.type === 'pdf' ? (
-                                            <object data={activeDoc.url} type="application/pdf" className="w-full h-full min-h-[50vh] bg-white rounded-lg shadow-sm border border-slate-200">
-                                                <div className="flex flex-col items-center justify-center h-full text-center p-6 bg-white rounded-xl shadow-lg">
-                                                    <FileText size={64} className="text-[#4A6FA5] mb-4" />
-                                                    <p className="text-xl font-bold text-[#2C3E50] mb-2">미리보기 제한</p>
-                                                    <p className="text-slate-500 mb-6 text-sm">보안상의 이유로 모바일 미리보기가 제한될 수 있습니다.</p>
-                                                    <a href={activeDoc.url} download={activeDoc.fileName} className="bg-[#4A6FA5] text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-[#3B5B8C]"><Download size={20} /> 파일 열기</a>
-                                                </div>
-                                            </object>
-                                        ) : (
-                                            <img src={activeDoc.url} alt="상세" className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
-                                        )}
-                                    </div>
-                                    <div className="bg-white border-t border-slate-200 p-4 flex justify-between items-center shrink-0">
-                                        <span className="text-sm font-bold text-slate-500 truncate max-w-[150px]">{activeDoc.fileName || '첨부파일'}</span>
-                                        <a href={activeDoc.url} download={activeDoc.fileName || "download"} className="flex items-center gap-2 bg-[#F0F2F5] text-[#2C3E50] px-4 py-3 rounded-xl font-bold hover:bg-slate-200 transition-colors no-underline text-sm"><Download size={18} /> 저장하기</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
                 </div>
             );
         }
 
-        const root = createRoot(document.getElementById('root'));
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
