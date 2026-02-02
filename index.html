@@ -18,7 +18,8 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-// --- 커스텀 아이콘: 왕국회관 (건물 + JW) ---
+// --- 커스텀 아이콘: 왕국회관 (건물 + JW 간판) ---
+// 요청하신 이미지의 하단 부분(건물 형태)을 반영했습니다.
 const KingdomHallIcon = ({ size = 24, className }) => (
   <svg 
     width={size} 
@@ -31,19 +32,12 @@ const KingdomHallIcon = ({ size = 24, className }) => (
     strokeLinejoin="round" 
     className={className}
   >
-    {/* 지붕 */}
     <path d="M2 8h20" />
-    <path d="M4 8L4 6h16l0 2" strokeWidth="1.5"/>
-    {/* 건물 외벽 */}
-    <rect x="4" y="8" width="16" height="13" />
-    {/* 문 (왼쪽) */}
-    <rect x="7" y="13" width="4" height="8" />
-    {/* 간판 (오른쪽) */}
-    <rect x="13" y="11" width="5" height="5" />
-    {/* J */}
-    <path d="M14.5 12.5v2a0.5 0.5 0 0 1 -0.5 0.5" strokeWidth="1.5" />
-    {/* W */}
-    <path d="M16 12.5l0.5 2.5l0.5 -2.5l0.5 2.5l0.5 -2.5" strokeWidth="1.5" />
+    <path d="M5 8v13h14v-13" />
+    <rect x="8" y="13" width="4" height="8" />
+    <rect x="14" y="11" width="5" height="5" />
+    <path d="M15.5 12.5v2a0.5 0.5 0 0 1 -0.5 0.5" strokeWidth="1.5" />
+    <path d="M17 12.5l0.5 2.5l0.5 -2.5l0.5 2.5l0.5 -2.5" strokeWidth="1.5" />
   </svg>
 );
 
@@ -84,7 +78,7 @@ const readFileAsBase64 = (file) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [documents, setDocuments] = useState([]);
-  // loginState: 'logged_out' | 'publisher'(전도인) | 'elder'(장로) | 'admin'(관리자)
+  // loginState: 'logged_out' | 'publisher' | 'elder' | 'admin'
   const [loginState, setLoginState] = useState('logged_out'); 
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -125,10 +119,12 @@ export default function App() {
     const unsubscribe = onSnapshot(collectionRef, (snapshot) => {
       let docs = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
       
+      // 전도인 권한일 때 장로 전용 게시물 필터링
       if (loginState === 'publisher') {
         docs = docs.filter(doc => doc.targetAudience !== 'elder');
       }
 
+      // 정렬: 고정(Pinned) 우선 -> 최신순
       docs.sort((a, b) => {
         if (!!a.isPinned === !!b.isPinned) {
           return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
@@ -151,13 +147,13 @@ export default function App() {
   // --- 핸들러 ---
   const handleLogin = (e) => {
     e.preventDefault();
-    if (passwordInput === '193500') {
+    if (passwordInput === '0000') {
       setLoginState('publisher'); 
       setLoginError('');
-    } else if (passwordInput === '303833') {
+    } else if (passwordInput === '2222') {
       setLoginState('elder'); 
       setLoginError('');
-    } else if (passwordInput === 'givemecourage') {
+    } else if (passwordInput === '8888') {
       setLoginState('admin'); 
       setLoginError('');
     } else {
@@ -290,8 +286,9 @@ export default function App() {
       <div className="min-h-screen relative flex items-center justify-center p-6 bg-[#F0F2F5]">
         <div className="bg-white rounded-3xl shadow-lg border border-slate-100 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-500">
           <div className="p-8 flex flex-col items-center">
-            <div className="bg-[#4A6FA5] text-white p-4 rounded-full mb-4 shadow-md">
-              <KingdomHallIcon size={36} />
+            {/* 로그인 화면 아이콘 (조금 더 크게) */}
+            <div className="bg-[#4A6FA5] text-white p-5 rounded-full mb-6 shadow-md transform scale-110">
+              <KingdomHallIcon size={40} />
             </div>
             
             <h2 className="text-2xl font-bold text-[#2C3E50] mb-1">전자 게시판</h2>
@@ -338,32 +335,32 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#F0F2F5] text-slate-800 pb-32 font-sans">
       
-      {/* 상단 헤더 (디자인 개선됨) */}
+      {/* 상단 헤더 (가독성 개선: 더 크고 여유롭게) */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
         <div className="px-5 py-5 flex justify-between items-center max-w-7xl mx-auto">
-          {/* 좌측: 아이콘 + 타이틀 + 뱃지 */}
+          {/* 좌측: 아이콘 + 타이틀 */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
             <h1 className="text-2xl md:text-3xl font-extrabold text-[#2C3E50] tracking-tight flex items-center gap-3">
               <span className="bg-[#4A6FA5] text-white p-2 rounded-xl shadow-sm">
-                <KingdomHallIcon size={28} />
+                <KingdomHallIcon size={32} />
               </span>
               게시판
             </h1>
             
-            {/* 권한 뱃지 (타이틀 옆 혹은 아래) */}
+            {/* 권한 뱃지 */}
             <div className="flex items-center">
               {loginState === 'admin' && (
-                <span className="text-xs font-bold bg-red-100 text-red-600 px-3 py-1 rounded-full border border-red-200">
+                <span className="text-sm font-bold bg-red-100 text-red-600 px-3 py-1 rounded-full border border-red-200">
                   관리자 모드
                 </span>
               )}
               {loginState === 'elder' && (
-                <span className="text-xs font-bold bg-purple-100 text-purple-600 px-3 py-1 rounded-full border border-purple-200">
+                <span className="text-sm font-bold bg-purple-100 text-purple-600 px-3 py-1 rounded-full border border-purple-200">
                   장로
                 </span>
               )}
               {loginState === 'publisher' && (
-                <span className="text-xs font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200">
+                <span className="text-sm font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200">
                   전도인
                 </span>
               )}
@@ -437,7 +434,7 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* 고정 표시 (핀) - 장로 태그가 없을때만 위치 겹침 방지 */}
+                  {/* 고정 표시 (핀) */}
                   {doc.isPinned && doc.targetAudience !== 'elder' && (
                     <div className="absolute top-2 right-2 bg-[#4A6FA5] text-white p-1 rounded-full shadow-lg z-10">
                       <Pin size={10} fill="currentColor" />
